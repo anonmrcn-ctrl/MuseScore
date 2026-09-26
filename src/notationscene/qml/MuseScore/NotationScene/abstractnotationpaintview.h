@@ -109,6 +109,10 @@ public:
     muse::PointF toLogical(const QPointF& point) const override;
     muse::RectF toLogical(const muse::RectF& rect) const;
 
+    // Coordinates for graphical review marks, independent of zoom and scrolling.
+    Q_INVOKABLE QPointF reviewToScore(const QPointF& viewPoint) const;
+    Q_INVOKABLE QPointF reviewToView(const QPointF& scorePoint) const;
+
     muse::PointF fromLogical(const muse::PointF& point) const override;
     muse::RectF fromLogical(const muse::RectF& rect) const override;
 
