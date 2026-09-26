@@ -25,6 +25,9 @@
 #include <QCursor>
 #include <QPainter>
 #include <QMimeData>
+#include <QFile>
+#include <QSaveFile>
+#include <QUrl>
 
 #include "async/async.h"
 #include "log.h"
@@ -1545,6 +1548,36 @@ QPointF AbstractNotationPaintView::reviewToScore(const QPointF& viewPoint) const
 QPointF AbstractNotationPaintView::reviewToView(const QPointF& scorePoint) const
 {
     return fromLogical(PointF::fromQPointF(scorePoint)).toQPointF();
+}
+
+bool AbstractNotationPaintView::saveReview(const QUrl& fileUrl, const QString& json) const
+{
+    if (!fileUrl.isLocalFile()) {
+        return false;
+    }
+
+    QSaveFile file(fileUrl.toLocalFile());
+    if (!file.open(QIODevice::WriteOnly)) {
+        return false;
+    }
+    const QByteArray data = json.toUtf8();
+    if (file.write(data) != data.size()) {
+        file.cancelWriting();
+        return false;
+    }
+    return file.commit();
+}
+
+QString AbstractNotationPaintView::loadReview(const QUrl& fileUrl) const
+{
+    if (!fileUrl.isLocalFile()) {
+        return {};
+    }
+    QFile file(fileUrl.toLocalFile());
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    return QString::fromUtf8(file.readAll());
 }
 
 RectF AbstractNotationPaintView::toLogical(const RectF& rect) const
