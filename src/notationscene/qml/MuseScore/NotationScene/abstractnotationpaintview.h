@@ -23,6 +23,7 @@
 
 #include <QTimer>
 #include <QElapsedTimer>
+#include <QUrl>
 #include <qqmlintegration.h>
 
 #include "modularity/ioc.h"
@@ -112,6 +113,8 @@ public:
     // Coordinates for graphical review marks, independent of zoom and scrolling.
     Q_INVOKABLE QPointF reviewToScore(const QPointF& viewPoint) const;
     Q_INVOKABLE QPointF reviewToView(const QPointF& scorePoint) const;
+    Q_INVOKABLE bool saveReview(const QUrl& fileUrl, const QString& json) const;
+    Q_INVOKABLE QString loadReview(const QUrl& fileUrl) const;
 
     muse::PointF fromLogical(const muse::PointF& point) const override;
     muse::RectF fromLogical(const muse::RectF& rect) const override;
