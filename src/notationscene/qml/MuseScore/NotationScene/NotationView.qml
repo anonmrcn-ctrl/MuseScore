@@ -108,6 +108,13 @@ FocusScope {
                     id: notationView
                     anchors.fill: parent
 
+                    ScoreReviewOverlay {
+                        anchors.fill: parent
+                        view: notationView
+                        visible: !notationView.publishMode && notationView.isMainView
+                        z: 20
+                    }
+
                     property NavigationPanel navigationPanel: NavigationPanel {
                         name: "ScoreView"
                         section: navSec

@@ -1167,6 +1167,10 @@ bool NotationActionController::canReceiveAction(const ActionCode& code) const
         return false;
     }
 
+    if (masterNotation->notation()->reviewInputBlocked()) {
+        return false;
+    }
+
     // All actions are disabled on the review page
     if (interactive()->currentUri().val == NOTATION_REVIEW_PAGE_URI) {
         return false;

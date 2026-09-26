@@ -42,6 +42,9 @@ class INotation
 public:
     virtual ~INotation() = default;
 
+    bool reviewInputBlocked() const { return m_reviewInputBlocked; }
+    void setReviewInputBlocked(bool blocked) { m_reviewInputBlocked = blocked; }
+
     virtual const muse::modularity::ContextPtr& iocContext() const = 0;
 
     virtual project::INotationProject* project() const = 0;
@@ -102,6 +105,9 @@ public:
 
     // notify
     virtual muse::async::Channel<muse::RectF> notationChanged() const = 0;
+
+private:
+    bool m_reviewInputBlocked = false;
 };
 
 using INotationPtr = std::shared_ptr<INotation>;

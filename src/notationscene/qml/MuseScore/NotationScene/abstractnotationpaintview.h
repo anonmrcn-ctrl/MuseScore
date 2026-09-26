@@ -23,6 +23,8 @@
 
 #include <QTimer>
 #include <QElapsedTimer>
+#include <QUrl>
+#include <QVariantMap>
 #include <qqmlintegration.h>
 
 #include "modularity/ioc.h"
@@ -70,6 +72,8 @@ class AbstractNotationPaintView : public muse::uicomponents::QuickPaintedView, p
     Q_PROPERTY(bool isMainView READ isMainView WRITE setIsMainView NOTIFY isMainViewChanged)
 
     Q_PROPERTY(bool readOnly READ readonly WRITE setReadonly NOTIFY readonlyChanged)
+    Q_PROPERTY(QString reviewScoreId READ reviewScoreId NOTIFY reviewContextChanged)
+    Q_PROPERTY(bool reviewActive READ reviewActive WRITE setReviewActive NOTIFY reviewActiveChanged)
 
     muse::GlobalInject<INotationConfiguration> notationConfiguration;
     muse::GlobalInject<INotationSceneConfiguration> configuration;
@@ -108,6 +112,19 @@ public:
     muse::PointF toLogical(const muse::PointF& point) const override;
     muse::PointF toLogical(const QPointF& point) const override;
     muse::RectF toLogical(const muse::RectF& rect) const;
+
+    // Coordinates for graphical review marks, independent of zoom and scrolling.
+    Q_INVOKABLE QPointF reviewToScore(const QPointF& viewPoint) const;
+    Q_INVOKABLE QPointF reviewToView(const QPointF& scorePoint) const;
+    QString reviewScoreId() const;
+    bool reviewActive() const { return m_reviewActive; }
+    void setReviewActive(bool active);
+    Q_INVOKABLE QVariantMap reviewAnchorAt(const QPointF& viewPoint) const;
+    Q_INVOKABLE QVariantMap reviewAnchorGeometry(const QVariantMap& anchor) const;
+    Q_INVOKABLE QString reviewRecoveryPath() const;
+    Q_INVOKABLE bool exportReviewPdf(const QUrl& fileUrl, const QString& json) const;
+    Q_INVOKABLE bool saveReview(const QUrl& fileUrl, const QString& json) const;
+    Q_INVOKABLE QString loadReview(const QUrl& fileUrl) const;
 
     muse::PointF fromLogical(const muse::PointF& point) const override;
     muse::RectF fromLogical(const muse::RectF& rect) const override;
@@ -189,6 +206,9 @@ signals:
     void isMainViewChanged(bool isMainView);
 
     void readonlyChanged();
+    void reviewActiveChanged();
+    void reviewContextChanged();
+    void reviewLayoutChanged();
 
 protected:
     INotationPtr notation() const;
@@ -305,6 +325,8 @@ private:
     qreal m_previousHorizontalScrollPosition = 0;
 
     bool m_readonly = false;
+    bool m_reviewActive = false;
+    bool m_reviewPreviousReadonly = false;
     bool m_publishMode = false;
     int m_lastAcceptedKey = -1;
     bool m_isMainView = false;

@@ -2220,6 +2220,9 @@ void NotationInteraction::cleanupDrumsetChanges(mu::engraving::InstrumentChange*
 //! NOTE Copied from Palette::applyPaletteElement
 bool NotationInteraction::applyPaletteElement(mu::engraving::EngravingItem* element, Qt::KeyboardModifiers modifiers)
 {
+    if (m_notation->masterNotation()->notation()->reviewInputBlocked()) {
+        return false;
+    }
     IF_ASSERT_FAILED(element) {
         return false;
     }
