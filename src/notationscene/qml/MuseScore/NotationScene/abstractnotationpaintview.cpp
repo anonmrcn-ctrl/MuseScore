@@ -1537,6 +1537,16 @@ PointF AbstractNotationPaintView::toLogical(const QPointF& point) const
     return toLogical(PointF::fromQPointF(point));
 }
 
+QPointF AbstractNotationPaintView::reviewToScore(const QPointF& viewPoint) const
+{
+    return toLogical(viewPoint).toQPointF();
+}
+
+QPointF AbstractNotationPaintView::reviewToView(const QPointF& scorePoint) const
+{
+    return fromLogical(PointF::fromQPointF(scorePoint)).toQPointF();
+}
+
 RectF AbstractNotationPaintView::toLogical(const RectF& rect) const
 {
     return m_matrix.inverted().map(rect);
