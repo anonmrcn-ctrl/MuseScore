@@ -25,6 +25,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Dialogs
 
 import Muse.Ui
 import Muse.UiComponents
@@ -74,6 +75,31 @@ FocusScope {
         reviewCanvas.requestPaint()
     }
 
+    function reviewDocument() {
+        return JSON.stringify({ format: "musescore-review-1", marks: reviewMarks, accepted: reviewAccepted })
+    }
+
+    function openReview(json) {
+        try {
+            const parsed = JSON.parse(json)
+            if (parsed.format !== "musescore-review-1" || !Array.isArray(parsed.marks))
+                throw new Error(qsTr("Unsupported review file"))
+            for (const mark of parsed.marks) {
+                if (!["text", "stroke"].includes(mark.type) || !Array.isArray(mark.points)
+                    || mark.points.length === 0
+                    || !mark.points.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))
+                    || (mark.type === "text" && typeof mark.text !== "string"))
+                    throw new Error(qsTr("Invalid review mark"))
+            }
+            reviewMarks = parsed.marks
+            reviewAccepted = !!parsed.accepted
+            reviewError.text = ""
+            reviewCanvas.requestPaint()
+        } catch (e) {
+            reviewError.text = qsTr("Cannot open review: ") + e.message
+        }
+    }
+
     property alias isNavigatorVisible: notationNavigator.visible
     property alias isBraillePanelVisible: brailleViewLoader.active
     property alias isMainView: notationView.isMainView
@@ -93,6 +119,27 @@ FocusScope {
     QtObject {
         id: prv
         readonly property int scrollbarMargin: 4
+    }
+
+    FileDialog {
+        id: reviewSaveDialog
+        title: qsTr("Save review")
+        fileMode: FileDialog.SaveFile
+        nameFilters: [qsTr("Review files (*.json)")]
+        onAccepted: {
+            if (!notationView.saveReview(selectedFile, root.reviewDocument()))
+                reviewError.text = qsTr("Cannot save review")
+            else
+                reviewError.text = ""
+        }
+    }
+
+    FileDialog {
+        id: reviewOpenDialog
+        title: qsTr("Open review")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [qsTr("Review files (*.json)")]
+        onAccepted: root.openReview(notationView.loadReview(selectedFile))
     }
 
     NotationContextMenuModel {
@@ -155,8 +202,18 @@ FocusScope {
                     reviewCanvas.requestPaint()
                 }
             }
+            Button {
+                text: qsTr("Save review")
+                visible: root.reviewMode
+                onClicked: reviewSaveDialog.open()
+            }
+            Button {
+                text: qsTr("Open review")
+                visible: root.reviewMode
+                onClicked: reviewOpenDialog.open()
+            }
             Label {
-                text: qsTr("Review marks are not saved yet")
+                id: reviewError
                 visible: root.reviewMode
             }
         }
