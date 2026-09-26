@@ -31,13 +31,17 @@
 using namespace mu::notation;
 using namespace muse::async;
 
-NotationUndoStack::NotationUndoStack(IGetScore* getScore, Channel<muse::RectF> notationChanged)
-    : m_getScore(getScore), m_notationChanged(notationChanged)
+NotationUndoStack::NotationUndoStack(IGetScore* getScore, Channel<muse::RectF> notationChanged,
+                                     std::function<bool()> reviewBlocked)
+    : m_reviewBlocked(std::move(reviewBlocked)), m_getScore(getScore), m_notationChanged(notationChanged)
 {
 }
 
 bool NotationUndoStack::canUndo() const
 {
+    if (reviewBlocked()) {
+        return false;
+    }
     IF_ASSERT_FAILED(undoStack()) {
         return false;
     }
@@ -47,6 +51,9 @@ bool NotationUndoStack::canUndo() const
 
 void NotationUndoStack::undo(mu::engraving::EditData* editData)
 {
+    if (reviewBlocked()) {
+        return;
+    }
     IF_ASSERT_FAILED(score()) {
         return;
     }
@@ -60,6 +67,9 @@ void NotationUndoStack::undo(mu::engraving::EditData* editData)
 
 bool NotationUndoStack::canRedo() const
 {
+    if (reviewBlocked()) {
+        return false;
+    }
     IF_ASSERT_FAILED(undoStack()) {
         return false;
     }
@@ -69,6 +79,9 @@ bool NotationUndoStack::canRedo() const
 
 void NotationUndoStack::redo(mu::engraving::EditData* editData)
 {
+    if (reviewBlocked()) {
+        return;
+    }
     IF_ASSERT_FAILED(score()) {
         return;
     }
@@ -82,6 +95,9 @@ void NotationUndoStack::redo(mu::engraving::EditData* editData)
 
 void NotationUndoStack::undoRedoToIndex(size_t idx, mu::engraving::EditData* editData)
 {
+    if (reviewBlocked()) {
+        return;
+    }
     auto stack = undoStack();
 
     IF_ASSERT_FAILED(stack) {
@@ -106,6 +122,9 @@ void NotationUndoStack::undoRedoToIndex(size_t idx, mu::engraving::EditData* edi
 
 void NotationUndoStack::transaction(const muse::TranslatableString& actionName, std::function<void(mu::engraving::Transaction&)> func)
 {
+    if (reviewBlocked()) {
+        return;
+    }
     IF_ASSERT_FAILED(score()) {
         return;
     }
@@ -151,7 +170,8 @@ void NotationUndoStack::commitChanges()
         return;
     }
 
-    transactionManager()->endTransaction(false);
+    // Legacy prepare/commit callers may mutate before commit; roll them back in review mode.
+    transactionManager()->endTransaction(reviewBlocked());
 
     notifyAboutStateChanged();
 }

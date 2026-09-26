@@ -84,6 +84,7 @@ AbstractNotationPaintView::AbstractNotationPaintView(QQuickItem* parent)
 
 AbstractNotationPaintView::~AbstractNotationPaintView()
 {
+    setReviewActive(false);
     m_inputController->deinit();
 
     if (m_notation && isMainView()) {
@@ -253,11 +254,13 @@ void AbstractNotationPaintView::onCurrentNotationChanged()
 {
     TRACEFUNC;
 
+    setReviewActive(false);
     if (m_notation) {
         onUnloadNotation(m_notation);
     }
 
     setNotation(globalContext()->currentNotation());
+    emit reviewContextChanged();
 
     if (!m_notation) {
         return;
@@ -280,6 +283,8 @@ void AbstractNotationPaintView::onLoadNotation(INotationPtr)
 
     m_notation->notationChanged().onReceive(this, [this](const RectF& updateRect) {
         m_pageCache.clear();
+        emit reviewLayoutChanged();
+        emit reviewContextChanged();
         updateLoopMarkers();
         updateShadowNoteVisibility();
         scheduleRedraw(updateRect.isValid() ? fromLogical(updateRect) : RectF());
@@ -1317,6 +1322,10 @@ void AbstractNotationPaintView::onElementPopupIsOpenChanged(const PopupModelType
 
 void AbstractNotationPaintView::mousePressEvent(QMouseEvent* event)
 {
+    if (m_reviewActive && event->button() == Qt::LeftButton) {
+        event->accept();
+        return;
+    }
     TRACEFUNC;
     forceFocusIn();
 
@@ -1335,6 +1344,10 @@ void AbstractNotationPaintView::mouseMoveEvent(QMouseEvent* event)
 
 void AbstractNotationPaintView::mouseDoubleClickEvent(QMouseEvent* event)
 {
+    if (m_reviewActive && event->button() == Qt::LeftButton) {
+        event->accept();
+        return;
+    }
     TRACEFUNC;
     forceFocusIn();
 
@@ -1345,6 +1358,10 @@ void AbstractNotationPaintView::mouseDoubleClickEvent(QMouseEvent* event)
 
 void AbstractNotationPaintView::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (m_reviewActive && event->button() == Qt::LeftButton) {
+        event->accept();
+        return;
+    }
     if (isInited()) {
         m_inputController->mouseReleaseEvent(event);
     }
@@ -1552,7 +1569,7 @@ QPointF AbstractNotationPaintView::reviewToView(const QPointF& scorePoint) const
 
 bool AbstractNotationPaintView::saveReview(const QUrl& fileUrl, const QString& json) const
 {
-    if (!fileUrl.isLocalFile()) {
+    if (!fileUrl.isLocalFile() || !fileUrl.toLocalFile().endsWith(".json", Qt::CaseInsensitive)) {
         return false;
     }
 
@@ -1561,6 +1578,10 @@ bool AbstractNotationPaintView::saveReview(const QUrl& fileUrl, const QString& j
         return false;
     }
     const QByteArray data = json.toUtf8();
+    if (data.size() > 16 * 1024 * 1024) {
+        file.cancelWriting();
+        return false;
+    }
     if (file.write(data) != data.size()) {
         file.cancelWriting();
         return false;
@@ -1570,11 +1591,14 @@ bool AbstractNotationPaintView::saveReview(const QUrl& fileUrl, const QString& j
 
 QString AbstractNotationPaintView::loadReview(const QUrl& fileUrl) const
 {
-    if (!fileUrl.isLocalFile()) {
+    if (!fileUrl.isLocalFile() || !fileUrl.toLocalFile().endsWith(".json", Qt::CaseInsensitive)) {
         return {};
     }
     QFile file(fileUrl.toLocalFile());
     if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    if (file.size() > 16 * 1024 * 1024) {
         return {};
     }
     return QString::fromUtf8(file.readAll());

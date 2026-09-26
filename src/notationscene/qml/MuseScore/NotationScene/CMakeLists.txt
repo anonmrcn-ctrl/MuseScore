@@ -35,6 +35,7 @@ qt_add_qml_module(notationscene_qml
         abstractelementpopupmodel.cpp
         abstractelementpopupmodel.h
         abstractnotationpaintview.cpp
+        scorereviewbridge.cpp
         abstractnotationpaintview.h
         continuouspanel.cpp
         continuouspanel.h
@@ -165,6 +166,8 @@ qt_add_qml_module(notationscene_qml
         timelineview.h
 
     QML_FILES
+        ScoreReviewOverlay.qml
+        ReviewDocument.js
         AbstractElementPopup.qml
         ConcertPitchControl.qml
         EditGridSizeDialog.qml

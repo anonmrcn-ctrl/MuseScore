@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include <functional>
 #include "draw/types/geometry.h"
 
 #include "inotationundostack.h"
@@ -39,7 +40,8 @@ namespace mu::notation {
 class NotationUndoStack : public INotationUndoStack
 {
 public:
-    NotationUndoStack(IGetScore* getScore, muse::async::Channel<muse::RectF> notationChanged);
+    NotationUndoStack(IGetScore* getScore, muse::async::Channel<muse::RectF> notationChanged,
+                      std::function<bool()> reviewBlocked = {});
 
     bool canUndo() const override;
     void undo(mu::engraving::EditData*) override;
@@ -74,6 +76,9 @@ public:
     muse::async::Notification undoRedoNotification() const override;
 
 private:
+    std::function<bool()> m_reviewBlocked;
+    bool reviewBlocked() const { return m_reviewBlocked && m_reviewBlocked(); }
+
     void notifyAboutNotationChanged();
     void notifyAboutStateChanged();
     void notifyAboutUndoRedo();

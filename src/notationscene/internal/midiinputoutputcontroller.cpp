@@ -25,6 +25,7 @@
 #include "midi/miditypes.h"
 
 #include "notation/inotation.h"
+#include "notation/imasternotation.h"
 #include "notation/inotationmidiinput.h"
 
 #include "log.h"
@@ -137,6 +138,11 @@ void MidiInputOutputController::checkConnection(const muse::midi::MidiDeviceID& 
 void MidiInputOutputController::onMidiEventReceived(const muse::midi::tick_t tick, const muse::midi::Event& event)
 {
     UNUSED(tick)
+
+    const auto master = globalContext()->currentMasterNotation();
+    if (master && master->notation()->reviewInputBlocked()) {
+        return;
+    }
 
     Ret ret = midiRemote()->process(event);
     if (check_ret(ret, Ret::Code::Undefined)) {

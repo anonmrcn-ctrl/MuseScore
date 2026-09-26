@@ -25,7 +25,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
-import QtQuick.Dialogs
 
 import Muse.Ui
 import Muse.UiComponents
@@ -43,62 +42,6 @@ FocusScope {
     property alias readOnly: notationView.readOnly
 
     property alias paintView: notationView
-    property bool reviewMode: false
-    property bool reviewAccepted: false
-    property bool reviewPreviousReadOnly: false
-    property var reviewMarks: []
-    property var reviewDraft: null
-    property string reviewTool: "pen"
-
-    function setReviewMode(enabled) {
-        if (enabled === reviewMode)
-            return
-        if (enabled) {
-            reviewPreviousReadOnly = notationView.readOnly
-            notationView.readOnly = true
-        } else {
-            notationView.readOnly = reviewPreviousReadOnly
-        }
-        reviewMode = enabled
-        reviewCanvas.requestPaint()
-    }
-
-    function reviewPoint(x, y) {
-        const p = notationView.reviewToScore(Qt.point(x, y))
-        return { x: p.x, y: p.y }
-    }
-
-    function addReviewText(value, x, y) {
-        if (!value.trim())
-            return
-        reviewMarks = reviewMarks.concat([{ type: "text", points: [reviewPoint(x, y)], text: value }])
-        reviewCanvas.requestPaint()
-    }
-
-    function reviewDocument() {
-        return JSON.stringify({ format: "musescore-review-1", marks: reviewMarks, accepted: reviewAccepted })
-    }
-
-    function openReview(json) {
-        try {
-            const parsed = JSON.parse(json)
-            if (parsed.format !== "musescore-review-1" || !Array.isArray(parsed.marks))
-                throw new Error(qsTr("Unsupported review file"))
-            for (const mark of parsed.marks) {
-                if (!["text", "stroke"].includes(mark.type) || !Array.isArray(mark.points)
-                    || mark.points.length === 0
-                    || !mark.points.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))
-                    || (mark.type === "text" && typeof mark.text !== "string"))
-                    throw new Error(qsTr("Invalid review mark"))
-            }
-            reviewMarks = parsed.marks
-            reviewAccepted = !!parsed.accepted
-            reviewError.text = ""
-            reviewCanvas.requestPaint()
-        } catch (e) {
-            reviewError.text = qsTr("Cannot open review: ") + e.message
-        }
-    }
 
     property alias isNavigatorVisible: notationNavigator.visible
     property alias isBraillePanelVisible: brailleViewLoader.active
@@ -119,27 +62,6 @@ FocusScope {
     QtObject {
         id: prv
         readonly property int scrollbarMargin: 4
-    }
-
-    FileDialog {
-        id: reviewSaveDialog
-        title: qsTr("Save review")
-        fileMode: FileDialog.SaveFile
-        nameFilters: [qsTr("Review files (*.json)")]
-        onAccepted: {
-            if (!notationView.saveReview(selectedFile, root.reviewDocument()))
-                reviewError.text = qsTr("Cannot save review")
-            else
-                reviewError.text = ""
-        }
-    }
-
-    FileDialog {
-        id: reviewOpenDialog
-        title: qsTr("Open review")
-        fileMode: FileDialog.OpenFile
-        nameFilters: [qsTr("Review files (*.json)")]
-        onAccepted: root.openReview(notationView.loadReview(selectedFile))
     }
 
     NotationContextMenuModel {
@@ -164,60 +86,6 @@ FocusScope {
 
         SeparatorLine { visible: tabPanel.visible }
 
-        RowLayout {
-            Layout.fillWidth: true
-            visible: !notationView.publishMode
-            spacing: 6
-            Button {
-                text: root.reviewMode ? qsTr("Close review") : qsTr("Review")
-                onClicked: root.setReviewMode(!root.reviewMode)
-            }
-            Button {
-                text: qsTr("Pen")
-                visible: root.reviewMode
-                enabled: !root.reviewAccepted
-                onClicked: root.reviewTool = "pen"
-            }
-            Button {
-                text: qsTr("Text")
-                visible: root.reviewMode
-                enabled: !root.reviewAccepted
-                onClicked: root.reviewTool = "text"
-            }
-            Button {
-                text: qsTr("Accept review")
-                visible: root.reviewMode
-                enabled: !root.reviewAccepted
-                onClicked: {
-                    root.reviewAccepted = true
-                    reviewCanvas.requestPaint()
-                }
-            }
-            Button {
-                text: qsTr("Discard review")
-                visible: root.reviewMode
-                onClicked: {
-                    root.reviewMarks = []
-                    root.reviewAccepted = false
-                    reviewCanvas.requestPaint()
-                }
-            }
-            Button {
-                text: qsTr("Save review")
-                visible: root.reviewMode
-                onClicked: reviewSaveDialog.open()
-            }
-            Button {
-                text: qsTr("Open review")
-                visible: root.reviewMode
-                onClicked: reviewOpenDialog.open()
-            }
-            Label {
-                id: reviewError
-                visible: root.reviewMode
-            }
-        }
-
         SplitView {
             id: splitView
 
@@ -240,103 +108,11 @@ FocusScope {
                     id: notationView
                     anchors.fill: parent
 
-                    onMatrixChanged: reviewCanvas.requestPaint()
-
-                    Canvas {
-                        id: reviewCanvas
+                    ScoreReviewOverlay {
                         anchors.fill: parent
-                        visible: root.reviewMode
-                        onPaint: {
-                            const ctx = getContext("2d")
-                            ctx.clearRect(0, 0, width, height)
-                            const marks = root.reviewDraft ? root.reviewMarks.concat([root.reviewDraft]) : root.reviewMarks
-                            ctx.strokeStyle = root.reviewAccepted ? "#255d91" : "#bf3030"
-                            ctx.fillStyle = ctx.strokeStyle
-                            ctx.lineWidth = 2
-                            ctx.lineCap = "round"
-                            ctx.lineJoin = "round"
-                            for (const mark of marks) {
-                                if (mark.type === "text") {
-                                    const p = notationView.reviewToView(Qt.point(mark.points[0].x, mark.points[0].y))
-                                    ctx.font = "18px sans-serif"
-                                    ctx.fillText(mark.text, p.x, p.y)
-                                    continue
-                                }
-                                ctx.beginPath()
-                                for (let i = 0; i < mark.points.length; ++i) {
-                                    const p = notationView.reviewToView(Qt.point(mark.points[i].x, mark.points[i].y))
-                                    if (i === 0) ctx.moveTo(p.x, p.y)
-                                    else ctx.lineTo(p.x, p.y)
-                                }
-                                ctx.stroke()
-                            }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            enabled: root.reviewMode && !root.reviewAccepted
-                            onPressed: function(mouse) {
-                                if (root.reviewTool === "text") {
-                                    reviewText.x = Math.min(mouse.x, reviewCanvas.width - reviewText.width)
-                                    reviewText.y = Math.min(mouse.y, reviewCanvas.height - reviewText.height)
-                                    reviewText.scoreX = mouse.x
-                                    reviewText.scoreY = mouse.y
-                                    reviewText.visible = true
-                                    reviewInput.forceActiveFocus()
-                                    return
-                                }
-                                root.reviewDraft = { type: "stroke", points: [root.reviewPoint(mouse.x, mouse.y)] }
-                                reviewCanvas.requestPaint()
-                            }
-                            onPositionChanged: function(mouse) {
-                                if (!pressed || !root.reviewDraft) return
-                                root.reviewDraft.points.push(root.reviewPoint(mouse.x, mouse.y))
-                                reviewCanvas.requestPaint()
-                            }
-                            onReleased: {
-                                if (!root.reviewDraft) return
-                                root.reviewMarks = root.reviewMarks.concat([root.reviewDraft])
-                                root.reviewDraft = null
-                                reviewCanvas.requestPaint()
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        id: reviewText
-                        property real scoreX: 0
-                        property real scoreY: 0
-                        width: 270
-                        height: 85
-                        color: "white"
-                        border.color: "#555555"
-                        visible: false
-                        z: 10
-                        Column {
-                            anchors.fill: parent
-                            anchors.margins: 4
-                            TextField {
-                                id: reviewInput
-                                width: parent.width
-                                placeholderText: qsTr("Write on the score")
-                                onAccepted: reviewSave.clicked()
-                            }
-                            Row {
-                                Button {
-                                    id: reviewSave
-                                    text: qsTr("Insert")
-                                    onClicked: {
-                                        root.addReviewText(reviewInput.text, reviewText.scoreX, reviewText.scoreY)
-                                        reviewInput.text = ""
-                                        reviewText.visible = false
-                                    }
-                                }
-                                Button {
-                                    text: qsTr("Cancel")
-                                    onClicked: reviewText.visible = false
-                                }
-                            }
-                        }
+                        view: notationView
+                        visible: !notationView.publishMode && notationView.isMainView
+                        z: 20
                     }
 
                     property NavigationPanel navigationPanel: NavigationPanel {
